@@ -1,34 +1,10 @@
 "use client";
 
-import { getWallets as getStandardWallets } from "@wallet-standard/app";
+import { useWallet } from "@solana/wallet-adapter-react";
+import { WalletMultiButton } from "@solana/wallet-adapter-react-ui";
 import { useEffect, useMemo, useState } from "react";
+import { createLoginMessage, type LoginChallenge } from "@/lib/login-message";
 
-type StandardAccount = { address: string; features: readonly string[] };
-type StandardWallet = {
-  name: string;
-  icon: string;
-  accounts: readonly StandardAccount[];
-  features: Record<string, unknown> & {
-    "standard:connect"?: { connect(): Promise<{ accounts: readonly StandardAccount[] }> };
-    "standard:disconnect"?: { disconnect(): Promise<void> };
-    "standard:events"?: {
-      on(event: "change", listener: (changes: { accounts?: readonly StandardAccount[] }) => void): () => void;
-    };
-    "solana:signMessage"?: {
-      signMessage(...inputs: { account: StandardAccount; message: Uint8Array }[]): Promise<readonly { signature: Uint8Array }[]>;
-    };
-  };
-};
-
-type WalletOption = {
-  id: string;
-  name: string;
-  icon: string;
-  wallet: StandardWallet | null;
-  installUrl: string;
-};
-
-type Challenge = { nonce: string; domain: string; issuedAt: string };
 type Access = { cluster: string; programId: string; memberships: { account: string; tenant: string; role: string; expiresAt: number | null }[] };
 
 const toBase64 = (bytes: Uint8Array) => {
@@ -39,39 +15,8 @@ const toBase64 = (bytes: Uint8Array) => {
 
 const compact = (address: string) => `${address.slice(0, 5)}…${address.slice(-5)}`;
 
-const walletCatalog = [
-  { id: "phantom", name: "Phantom", icon: "P", installUrl: "https://phantom.com/download" },
-  { id: "solflare", name: "Solflare", icon: "S", installUrl: "https://www.solflare.com/download" },
-  { id: "backpack", name: "Backpack", icon: "B", installUrl: "https://backpack.app/downloads" },
-  { id: "coinbase", name: "Coinbase Wallet", icon: "C", installUrl: "https://www.coinbase.com/wallet/downloads" },
-  { id: "glow", name: "Glow", icon: "G", installUrl: "https://glow.app" },
-] as const;
-
-const supportsLogin = (wallet: StandardWallet) =>
-  Boolean(wallet.features["standard:connect"] && wallet.features["solana:signMessage"]);
-
-const listWallets = (): WalletOption[] => {
-  const detected = (getStandardWallets().get() as readonly unknown[])
-    .filter((wallet): wallet is StandardWallet => supportsLogin(wallet as StandardWallet));
-  const used = new Set<StandardWallet>();
-  const common = walletCatalog.map((entry) => {
-    const wallet = detected.find((candidate) => candidate.name.toLowerCase().includes(entry.name.toLowerCase()));
-    if (wallet) used.add(wallet);
-    return { ...entry, wallet: wallet ?? null };
-  });
-  const additional = detected.filter((wallet) => !used.has(wallet)).map((wallet) => ({
-    id: `standard:${wallet.name}`,
-    name: wallet.name,
-    icon: wallet.icon,
-    wallet,
-    installUrl: "https://solana.com/solana-wallets",
-  }));
-  return [...common, ...additional];
-};
-
 export default function Home() {
-  const [wallets, setWallets] = useState<WalletOption[]>([]);
-  const [selectedWallet, setSelectedWallet] = useState("phantom");
+  const { publicKey, connected, disconnect, signMessage } = useWallet();
   const [address, setAddress] = useState("");
   const [authenticated, setAuthenticated] = useState(false);
   const [status, setStatus] = useState("连接钱包以继续");
@@ -79,11 +24,6 @@ export default function Home() {
   const [access, setAccess] = useState<Access | null>(null);
 
   useEffect(() => {
-    const registry = getStandardWallets();
-    const refreshWallets = () => setWallets(listWallets());
-    refreshWallets();
-    const offRegister = registry.on("register", refreshWallets);
-    const offUnregister = registry.on("unregister", refreshWallets);
     fetch("/api/auth/session")
       .then(async (response) => response.ok ? response.json() as Promise<{ wallet: string }> : null)
       .then((session) => {
@@ -95,59 +35,35 @@ export default function Home() {
         }
       })
       .catch(() => undefined);
-    return () => {
-      offRegister();
-      offUnregister();
-    };
   }, []);
 
-  const wallet = wallets.find(({ id }) => id === selectedWallet) ?? null;
-  const standardWallet = wallet?.wallet ?? null;
-
   useEffect(() => {
-    const accountChanged = ({ accounts }: { accounts?: readonly StandardAccount[] }) => {
-      const next = accounts?.[0]?.address ?? "";
-      setAddress(next);
+    const next = publicKey?.toBase58() ?? "";
+    if (!next || next === address) return;
+    if (address) {
       setAuthenticated(false);
+      setAccess(null);
       void fetch("/api/auth/session", { method: "DELETE" });
-      setStatus(next ? "账户已切换，请重新签名" : "钱包已断开");
-    };
-    return standardWallet?.features["standard:events"]?.on("change", accountChanged);
-  }, [standardWallet]);
+      setStatus("账户已切换，请重新签名");
+    }
+    setAddress(next);
+  }, [publicKey, address]);
 
   const avatar = useMemo(() => address.slice(0, 2).toUpperCase() || "◎", [address]);
 
   async function login() {
-    if (!standardWallet) {
-      window.open(wallet?.installUrl ?? "https://solana.com/wallets", "_blank", "noopener,noreferrer");
-      setStatus(`请先安装 ${wallet?.name ?? "Solana 钱包"}`);
-      return;
-    }
     setBusy(true);
     try {
-      const connect = standardWallet.features["standard:connect"];
-      const signMessage = standardWallet.features["solana:signMessage"];
-      if (!connect || !signMessage) throw new Error("该钱包不支持消息签名登录");
-      const connection = await connect.connect();
-      const account = connection.accounts[0] ?? standardWallet.accounts[0];
-      if (!account) throw new Error("钱包未返回可用账户");
-      const walletAddress = account.address;
+      if (!connected || !publicKey) throw new Error("请先选择并连接钱包");
+      if (!signMessage) throw new Error("该钱包不支持消息签名登录，请选择其他钱包");
+      const walletAddress = publicKey.toBase58();
       setAddress(walletAddress);
       setStatus("等待钱包签名…");
       const challengeResponse = await fetch("/api/auth/challenge", { cache: "no-store" });
       if (!challengeResponse.ok) throw new Error("无法创建登录请求");
-      const challenge = await challengeResponse.json() as Challenge;
-      const statement = [
-        "登录 FlowVault",
-        "",
-        `Wallet: ${walletAddress}`,
-        `Domain: ${challenge.domain}`,
-        `Nonce: ${challenge.nonce}`,
-        `Issued At: ${challenge.issuedAt}`,
-        "",
-        "此签名不会发起交易或产生费用。",
-      ].join("\n");
-      const [{ signature }] = await signMessage.signMessage({ account, message: new TextEncoder().encode(statement) });
+      const challenge = await challengeResponse.json() as LoginChallenge;
+      const statement = createLoginMessage(challenge, walletAddress);
+      const signature = await signMessage(new TextEncoder().encode(statement));
       const verification = await fetch("/api/auth/verify", {
         method: "POST",
         headers: { "content-type": "application/json" },
@@ -161,7 +77,7 @@ export default function Home() {
       if (accessResponse.ok) setAccess(await accessResponse.json() as Access);
     } catch (error) {
       const message = error instanceof Error ? error.message : "操作已取消";
-      setStatus(message.includes("User rejected") ? "你取消了钱包操作" : message);
+      setStatus(/reject|cancel/i.test(message) ? "你取消了钱包操作，可以重新签名" : message);
     } finally {
       setBusy(false);
     }
@@ -169,7 +85,7 @@ export default function Home() {
 
   async function logout() {
     await Promise.all([
-      standardWallet?.features["standard:disconnect"]?.disconnect().catch(() => undefined),
+      disconnect().catch(() => undefined),
       fetch("/api/auth/session", { method: "DELETE" }).catch(() => undefined),
     ]);
     setAddress("");
@@ -218,23 +134,8 @@ export default function Home() {
               <div className="walletIcon" aria-hidden="true">FV</div>
               <h2>打开你的控制台</h2>
               <p>安全签名验证所有权，不发送交易、不收取费用。</p>
-              <div className="walletChoices" aria-label="选择钱包">
-                {wallets.map((option) => (
-                  <button
-                    className={option.id === selectedWallet ? "walletChoice active" : "walletChoice"}
-                    key={option.id}
-                    onClick={() => {
-                      setSelectedWallet(option.id);
-                      setStatus(option.wallet ? `已选择 ${option.name}` : `${option.name} 尚未安装`);
-                    }}
-                    type="button"
-                  >
-                    <span>{option.icon.startsWith("data:") ? <i className="walletLogo" style={{ backgroundImage: `url(${option.icon})` }} /> : option.icon} {option.name}</span>
-                    <small>{option.wallet ? "已检测" : "未安装"}</small>
-                  </button>
-                ))}
-              </div>
-              <button className="primary" onClick={login} disabled={busy}>{busy ? "正在连接…" : standardWallet ? `使用 ${wallet?.name} 连接并签名` : `安装 ${wallet?.name ?? "钱包"}`}<span>→</span></button>
+              <WalletMultiButton className="walletAdapterButton" />
+              <button className="primary" onClick={login} disabled={busy || !connected}>{busy ? "等待钱包签名…" : connected ? "签名并登录" : "连接钱包后继续"}<span>→</span></button>
               <div className="status" aria-live="polite"><i /> {status}</div>
             </>
           )}
