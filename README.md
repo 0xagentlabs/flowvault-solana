@@ -1,4 +1,6 @@
-# Solana SaaS Control Plane
+# FlowVault — Agent-Native Solana Treasury
+
+FlowVault 是面向 AI Agent、创作者与小型团队的非托管资金自动化层：owner 将任意 SPL Token / Token-2022 存入 PDA 控制的 ATA，授权低余额 agent 执行有限额策略，并保留轮换 agent 与紧急暂停的最终控制权。商业模式为团队策略、审计告警与 KMS 集成订阅，链上金库始终无需托管。
 
 Pinocchio 0.11 链上 SaaS 控制器与 Next.js 钱包控制台。身份来源是 Wallet Standard 钱包，成员角色、资源最低角色与数据哈希均存储在 Solana PDA，不使用中心化数据库。
 
@@ -32,7 +34,7 @@ npm run dev
 
 生产部署必须配置至少 32 字节的随机环境变量 `SOLANA_AUTH_SECRET`；未配置时仅使用适合本地开发的默认值。
 
-## Agent SPL Token Vault
+## Agent SPL Token Vault（核心产品）
 
 `programs/token-vault` 是 Pinocchio 实现的通用代币金库。每个 owner 对应一个 `['vault', owner]` PDA；该 PDA 同时作为 vault ATA 的 authority。支持原版 SPL Token 与 Token-2022 的 `TransferChecked`，并提供：
 
@@ -46,6 +48,7 @@ TypeScript 构造器位于 `sdk/vault.ts`。调用方应先用 `getOrCreateAssoc
 ```bash
 cargo test
 npm run typecheck
+npm test
 cp automation/policy.example.json automation/policy.json
 # 编辑公钥和订单；适用于 cron、GitHub Actions 或 Multica 定时任务
 npm run vault:run -- automation/policy.json
@@ -53,6 +56,10 @@ npm run vault:run -- automation/policy.json
 
 生产运行时应在每次触发中调用 `executePolicy(policy, signer, false)`。建议使用最小余额 agent、严格 `maxAmount`、独立 RPC、交易模拟与告警；暂停或轮换 agent 只能由 owner 签名。
 
-## 部署到 Vercel
+## Devnet
 
-导入仓库后选择 Next.js 框架预设，并配置 `SOLANA_AUTH_SECRET`。
+前端和 SDK 默认使用 devnet 程序 `BGGyTuZzsodBuPScxBdfJCUdVVF3KHUn9cKG5Jn8kVSa`（由程序字节常量确定）。Explorer 链接可直接核验程序账户。
+
+## 部署到 Vercel / CI/CD
+
+GitHub Actions 对每次 PR 与 main 推送运行 TypeScript 类型检查、SDK 调用测试、Next.js 构建及 Rust 合约测试。Vercel Git Integration 关联 main 后自动发布生产版本；配置至少 32 字节的 `SOLANA_AUTH_SECRET`。

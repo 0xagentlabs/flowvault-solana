@@ -40,11 +40,11 @@ const toBase64 = (bytes: Uint8Array) => {
 const compact = (address: string) => `${address.slice(0, 5)}…${address.slice(-5)}`;
 
 const walletCatalog = [
-  { id: "phantom", name: "Phantom", icon: "👻", installUrl: "https://phantom.com/download" },
-  { id: "solflare", name: "Solflare", icon: "☀️", installUrl: "https://www.solflare.com/download" },
-  { id: "backpack", name: "Backpack", icon: "🎒", installUrl: "https://backpack.app/downloads" },
-  { id: "coinbase", name: "Coinbase Wallet", icon: "🔵", installUrl: "https://www.coinbase.com/wallet/downloads" },
-  { id: "glow", name: "Glow", icon: "🌈", installUrl: "https://glow.app" },
+  { id: "phantom", name: "Phantom", icon: "P", installUrl: "https://phantom.com/download" },
+  { id: "solflare", name: "Solflare", icon: "S", installUrl: "https://www.solflare.com/download" },
+  { id: "backpack", name: "Backpack", icon: "B", installUrl: "https://backpack.app/downloads" },
+  { id: "coinbase", name: "Coinbase Wallet", icon: "C", installUrl: "https://www.coinbase.com/wallet/downloads" },
+  { id: "glow", name: "Glow", icon: "G", installUrl: "https://glow.app" },
 ] as const;
 
 const supportsLogin = (wallet: StandardWallet) =>
@@ -138,7 +138,7 @@ export default function Home() {
       if (!challengeResponse.ok) throw new Error("无法创建登录请求");
       const challenge = await challengeResponse.json() as Challenge;
       const statement = [
-        "登录 Solana Portal",
+        "登录 FlowVault",
         "",
         `Wallet: ${walletAddress}`,
         `Domain: ${challenge.domain}`,
@@ -181,17 +181,17 @@ export default function Home() {
   return (
     <main>
       <nav>
-        <a className="brand" href="#" aria-label="Solana Portal 首页">
-          <span className="brandMark">S</span>
-          <span>Solana Portal</span>
+        <a className="brand" href="#" aria-label="FlowVault 首页">
+          <span className="brandMark">F</span>
+          <span>FlowVault</span>
         </a>
-        <span className="network"><i /> Mainnet</span>
+        <span className="network"><i /> Devnet live</span>
       </nav>
 
       <section className="hero">
-        <div className="eyebrow"><span>✦</span> WEB3 ACCESS</div>
-        <h1>你的钱包，<br /><em>就是通行证。</em></h1>
-        <p className="lede">连接 Solana 钱包，通过一次安全签名进入你的链上世界。无需密码，不会产生任何交易费用。</p>
+        <div className="eyebrow"><span>◆</span> AGENT-NATIVE TREASURY</div>
+        <h1>让资金自动流动，<br /><em>控制权始终在你。</em></h1>
+        <p className="lede">FlowVault 是面向 AI Agent 与团队的非托管 Solana 金库。委托自动执行、设置单笔限额，随时链上一键暂停。</p>
 
         <div className="card">
           <div className="glow" />
@@ -215,9 +215,9 @@ export default function Home() {
             </>
           ) : (
             <>
-              <div className="walletIcon">⌁</div>
-              <h2>连接你的钱包</h2>
-              <p>我们将请求一条消息签名来验证所有权。</p>
+              <div className="walletIcon" aria-hidden="true">FV</div>
+              <h2>打开你的控制台</h2>
+              <p>安全签名验证所有权，不发送交易、不收取费用。</p>
               <div className="walletChoices" aria-label="选择钱包">
                 {wallets.map((option) => (
                   <button
@@ -241,10 +241,10 @@ export default function Home() {
         </div>
 
         <div className="trust">
-          <span>◇ 无 Gas 费用</span><span>◈ 不发起交易</span><span>⌁ 本地会话</span>
+          <span>非托管金库</span><span>Token + Token-2022</span><span>Owner 紧急暂停</span>
         </div>
       </section>
-      <footer>Built on <strong>Solana</strong><span>Secure · Fast · Decentralized</span></footer>
+      <footer>FlowVault · Built on <strong>Solana</strong><span>Programmable · Non-custodial · Auditable</span></footer>
     </main>
   );
 }

@@ -6,8 +6,8 @@ import {
 } from "@solana/spl-token";
 
 export const VAULT_PROGRAM_ID = new PublicKey(Uint8Array.from([
-  86, 65, 85, 76, 84, 1, 9, 37, 72, 91, 15, 211, 44, 101, 8, 193,
-  17, 64, 201, 87, 39, 222, 14, 111, 92, 10, 198, 71, 25, 166, 4, 218,
+  152, 126, 164, 136, 185, 244, 220, 169, 98, 41, 190, 178, 203, 145, 232, 13,
+  199, 180, 66, 136, 83, 110, 163, 113, 140, 122, 236, 11, 201, 19, 54, 67,
 ]));
 
 export function vaultPda(authority: PublicKey, programId = VAULT_PROGRAM_ID) {
