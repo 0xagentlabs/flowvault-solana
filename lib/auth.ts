@@ -1,4 +1,5 @@
 import { createHmac, timingSafeEqual, verify } from "node:crypto";
+import { createLoginMessage } from "@/lib/login-message";
 
 export const CHALLENGE_COOKIE = "solana_challenge";
 export const SESSION_COOKIE = "solana_session";
@@ -34,18 +35,7 @@ export function unseal<T>(token?: string): T | null {
   }
 }
 
-export function loginMessage(challenge: Challenge, wallet: string) {
-  return [
-    "登录 Solana Portal",
-    "",
-    `Wallet: ${wallet}`,
-    `Domain: ${challenge.domain}`,
-    `Nonce: ${challenge.nonce}`,
-    `Issued At: ${challenge.issuedAt}`,
-    "",
-    "此签名不会发起交易或产生费用。",
-  ].join("\n");
-}
+export const loginMessage = createLoginMessage;
 
 export function decodeBase58(value: string) {
   const alphabet = "123456789ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz";
